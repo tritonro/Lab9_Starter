@@ -1,4 +1,40 @@
-function breakPage() {
+class ValidationError extends Error {
+  constructor(message) {
+    super(message); // (1)
+    this.name = "ValidationError"; // (2)
+  }
+}
+
+const errorReportingObject = {};
+errorReportingObject.errorReportingURL = "https://cdn.trackjs.com/agent/v3/latest/t.js";
+
+function URLEncodeErrors(val){
+  let encodedVal = encodeURIComponent(val);
+  /* fix the omissions */
+  encodedVal = encodedVal.replace(/~/g, '%7E');
+  encodedVal = encodedVal.replace(/!/g, '%21');
+  encodedVal = encodedVal.replace(/\(/g, '%28');
+  encodedVal = encodedVal.replace(/\)/g, '%29');
+  encodedVal = encodedVal.replace(/'/g, '%27');
+  return encodedVal.replace(/\%20/g,'+');
+}
+errorReportingObject.encodeValue = URLEncodeErrors;
+function reportJSError(msg, url, lineNum){
+  let payload = "url=" + errorReportingObject.encodeValue(url);
+  payload += "&message=" + errorReportingObject.encodeValue(msg);
+  payload += "&line=" + errorReportingObject.encodeValue(lineNum);
+  sendRequest(errorReportingObject.errorReportingURL, errorReportingObject.encodeValue(payload));
+  return true;
+}
+
+function sendRequest(url, payload) {
+  const img = new Image();
+  img.src = url + "?" + payload;
+}
+
+
+
+  function breakPage() {
   const operatorMenu = document.getElementById("operator");
   operatorMenu.innerHTML = "";
 }
@@ -12,6 +48,18 @@ function fixPage() {
         <option value="%">%</option>
     `;
 }
+
+window.onerror = (a, b, c, d, e) => {
+  reportJSError(a, b, c);
+  console.log(`message: ${a}`);
+  console.log(`source: ${b}`);
+  console.log(`lineno: ${c}`);
+  console.log(`colno: ${d}`);
+  console.log(`error: ${e}`);
+
+  return true;
+};
+
 function init() {
   let form = document.querySelector("form");
   form.addEventListener("submit", (e) => {
@@ -19,15 +67,20 @@ function init() {
     let output = document.querySelector("output");
     let firstNum = document.querySelector("#first-num").value;
     let secondNum = document.querySelector("#second-num").value;
+    let operator;
+
     try {
-      let operator = document.querySelector("#operator").value;
+      operator = document.querySelector("#operator").value;
       console.assert(operator !== "");
-    } catch (err) {
+      if (operator === ""){
+        throw new ValidationError ("Please enter a valid operator");
+      }
+    }
+    catch (err) {
       fixPage();
-    } finally {
-      output.innerHTML = eval(`${firstNum}
-        ${operator}
-        ${secondNum}`);
+    }
+    finally {
+      output.innerHTML = eval(`${firstNum} ${operator} ${secondNum}`);
     }
   });
 
@@ -98,7 +151,7 @@ function init() {
     console.trace("Trace button clicked");
   });
   global_err_btn.addEventListener("click", () => {
-    //  throw new Error("Global error triggered")
+      throw new Error("Global error triggered")
   });
 
   evil_btn.addEventListener("click", breakPage);
